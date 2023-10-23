@@ -7,42 +7,49 @@ from datetime import datetime, timezone, timedelta
 
 class Crane_counter():
     def __init__(self) -> None:
-        self.print_average_per = "day"  # print the average cranes folded per what? (hours, minutes, seconds, days)
+        with open("config.json", "r") as config:
+            config_data = json.load(config)
+        # print the average cranes folded per what? (hours, minutes, seconds, days)
+        self.MEASURE_IN = config_data["measure_in"]
+        self.QUICK_ADD_AMOUNT = config_data["quick_add_amount"]
+        self.DEFAULT_FONT = ("Consolas", config_data["font_size"])
+        self.BG_COLOR = config_data["bg_color"]
+        self.FG_COLOR = config_data["fg_color"]
+
         self.DEFAULT_DATA = {"desired_amount": 1000, "amount_folded": []}
-        self.DEFAULT_FONT = ("Consolas", 30)
 
         self.root = tk.Tk()
+        self.root.configure(bg=self.BG_COLOR)
         self.root.title("Crane counter")
 
-        self.progress_label = tk.Label(self.root)
+        self.progress_label = tk.Label(self.root, fg=self.FG_COLOR, bg=self.BG_COLOR, font=self.DEFAULT_FONT)
 
-        self.add_entry = tk.Entry(self.root, font=self.DEFAULT_FONT)
-        self.add_button = tk.Button(self.root, text="Add!", font=self.DEFAULT_FONT,
-                                    command=lambda: self.logic(self.add_entry.get()))
-        self.add_1_button = tk.Button(self.root, text="Add 1!", font=self.DEFAULT_FONT, command=lambda: self.logic("1"))
+        self.add_entry = tk.Entry(self.root, fg=self.FG_COLOR, bg=self.BG_COLOR, font=self.DEFAULT_FONT, width=5)
+        self.add_button = tk.Button(self.root, fg=self.FG_COLOR, bg=self.BG_COLOR, text="Add!", font=self.DEFAULT_FONT,
+                                    width=16, command=lambda: self.logic(self.add_entry.get()))
+        self.add_1_button = tk.Button(self.root, fg=self.FG_COLOR, bg=self.BG_COLOR,
+                                      text=f"Add {self.QUICK_ADD_AMOUNT}!", font=self.DEFAULT_FONT, width=16, command=lambda: self.logic(str(self.QUICK_ADD_AMOUNT)))
+        self.subtract_button = tk.Button(self.root, fg=self.FG_COLOR, bg=self.BG_COLOR, text="Subtract!", font=self.DEFAULT_FONT,
+                                         width=16, command=lambda: self.logic(self.add_entry.get()))
+        self.subtract_1_button = tk.Button(self.root, fg=self.FG_COLOR, bg=self.BG_COLOR, text=f"Subtract -{self.QUICK_ADD_AMOUNT}!",
+                                           font=self.DEFAULT_FONT, width=16, command=lambda: self.logic("-" + str(self.QUICK_ADD_AMOUNT)))
 
-        self.subtract_entry = tk.Entry(self.root, font=self.DEFAULT_FONT, width=5)
-        self.subtract_button = tk.Button(self.root, text="Subtract!", font=self.DEFAULT_FONT,
-                                         command=lambda: self.logic(self.subtract_entry.get()))
-        self.subtract_1_button = tk.Button(self.root, text="Subtract 1!",
-                                           font=self.DEFAULT_FONT, command=lambda: self.logic("-1"))
-
-        self.change_date_entry = tk.Entry(self.root, font=self.DEFAULT_FONT, width=16)
-        self.change_date_button = tk.Button(self.root, font=self.DEFAULT_FONT,
-                                            text="Change!", command=lambda: self.change_date())  # change the date
+        self.change_date_entry = tk.Entry(self.root, fg=self.FG_COLOR, bg=self.BG_COLOR,
+                                          font=self.DEFAULT_FONT, width=16)
+        self.change_date_button = tk.Button(self.root, fg=self.FG_COLOR, bg=self.BG_COLOR, font=self.DEFAULT_FONT,
+                                            width=16, text="Change!", command=lambda: self.change_date())  # change the date
 
         self.progress_label.grid(row=0, column=0, columnspan=3)
 
-        self.add_1_button.grid(row=0, column=0)
-        self.add_entry.grid(row=0, column=1)
-        self.add_button.grid(row=0, column=2)
+        self.add_1_button.grid(row=1, column=0, sticky="w")
+        self.add_entry.grid(row=1, column=1)
+        self.add_button.grid(row=1, column=2, sticky="e")
 
-        self.subtract_1_button.grid(row=1, column=0)
-        self.subtract_entry.grid(row=1, column=1)
-        self.subtract_button.grid(row=1, column=2)
+        self.subtract_1_button.grid(row=2, column=0, sticky="w")
+        self.subtract_button.grid(row=2, column=2, sticky="e")
 
-        self.change_date_entry.grid(row=2, column=0)
-        self.change_date_button.grid(row=2, column=2)
+        self.change_date_entry.grid(row=3, column=0, sticky="w")
+        self.change_date_button.grid(row=3, column=2, sticky="e")
 
         self.root.mainloop()
 
@@ -90,12 +97,14 @@ class Crane_counter():
         if seconds < data["amount_folded"][1][0]:
             data["amount_folded"][0][0] = seconds
         else:
-            print("change date cycle target is unexpected or date is too high")
+            self.progress_label["text"] += "\nDate entered is too high!"
 
         with open("data.json", "w") as file:
             file.write(json.dumps(data))
+        self.calculate_average()
 
     def write_to_json(self, amount):
+        self.add_entry.delete(0, "end")
         if amount != "clear":
             amount = int(amount)
         with open("data.json", "r") as file:
@@ -110,7 +119,7 @@ class Crane_counter():
         with open("data.json", "w") as file:
             if amount == "clear":
                 file.write(json.dumps(self.DEFAULT_DATA))
-                print("Cleared!")
+                self.progress_label["text"] = "Cleared!"
             else:
                 file.write(json.dumps(data))
 
@@ -122,11 +131,11 @@ class Crane_counter():
             total_folded += i[1]
         if len(data["amount_folded"]) > 1:
             time_difference = int(data["amount_folded"][-1][0]) - int(data["amount_folded"][0][0])
-            if self.print_average_per == "day":
+            if self.MEASURE_IN == "day":
                 time_difference = time_difference / 60 / 60 / 24
-            elif self.print_average_per == "hour":
+            elif self.MEASURE_IN == "hour":
                 time_difference = time_difference / 60 / 60
-            elif self.print_average_per == "minute":
+            elif self.MEASURE_IN == "minute":
                 time_difference = time_difference / 60
 
             # These are here so if total folded is 0 it will become 1, but when printing, it will remain 0
@@ -134,8 +143,8 @@ class Crane_counter():
         else:
             average = (1 if total_folded == 0 else total_folded)
         remaining_time = (data["desired_amount"] - total_folded)/average
-        print(
-            f"The average crane folding speed is {round(average, 2)} cranes/{self.print_average_per}.\nYou'll get to your goal in {round(remaining_time, 2)} {self.print_average_per}(s)\nYou need to make {data['desired_amount'] - total_folded} more")
+        text = f"The average crane folding speed is {round(average, 2)} cranes/{self.MEASURE_IN}.\nYou'll get to your goal in {round(remaining_time, 2)} {self.MEASURE_IN}(s)\nYou need to make {data['desired_amount'] - total_folded} more"
+        self.progress_label["text"] = text
 
 
 if __name__ == "__main__":
